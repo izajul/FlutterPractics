@@ -1,12 +1,17 @@
+import 'package:first_flutter_app/db/database_helper.dart';
+import 'package:first_flutter_app/models/note_model.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
 
 class NoteDetails extends StatefulWidget{
-  String _title ;
-  NoteDetails(this._title);
+  final String _title ;
+  Note _note;
+  NoteDetails(this._note,this._title);
 
   @override
   State<StatefulWidget> createState() {
-    return NoteDetailsState (_title);
+    return NoteDetailsState (_note,_title);
   }
 }
 
@@ -14,14 +19,21 @@ class NoteDetailsState extends State<NoteDetails> {
   static var _priorities = ['high','low'];
   var _commonPadding = 15.0;
   String _title;
+  Note _note;
 
-  NoteDetailsState(this._title); //constructor assign value
+  DataBaseHelper _dataBaseHelper = DataBaseHelper();
+
+  NoteDetailsState(this._note,this._title); //constructor assign value
+  TextEditingController _titleController = TextEditingController();
+  TextEditingController _descriptionController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
+
     TextStyle textStyle = Theme.of(context).textTheme.title;
-    TextEditingController _titleController = TextEditingController();
-    TextEditingController _descriptionController = TextEditingController();
+    _titleController.text = _note.title;
+    _descriptionController.text = _note.description;
+
     return WillPopScope(
       onWillPop:(){return _routeScreenPOP();},
       child: Scaffold(
@@ -42,10 +54,10 @@ class NoteDetailsState extends State<NoteDetails> {
                   );
                 }).toList(),
                 style: textStyle,
-                value: _priorities[1],
+                value: (_note.priority==0)?_priorities[0]:_priorities[1],
                 onChanged: (selectedValue){
                   setState(() {
-                    debugPrint("user selected $selectedValue");
+                    _updatePriorityAsInt(selectedValue);
                   });
                 },
               ),
@@ -57,7 +69,7 @@ class NoteDetailsState extends State<NoteDetails> {
                 controller: _titleController,
                 style: textStyle,
                 onChanged: (value){
-                  //Todo: will add some code later ..
+                  _note.title = _titleController.text;
                 },
                 decoration: InputDecoration(
                     labelStyle: textStyle,
@@ -75,7 +87,7 @@ class NoteDetailsState extends State<NoteDetails> {
                 controller: _descriptionController,
                 style: textStyle,
                 onChanged: (value){
-                  //todo: will add some code later ..
+                  _note.description = _descriptionController.text;
                 },
                 decoration: InputDecoration(
                     labelStyle: textStyle,
@@ -100,7 +112,7 @@ class NoteDetailsState extends State<NoteDetails> {
                       ),
                       onPressed: (){
                         setState(() {
-                          //todo: will add some code hear
+                          _saveBtn();
                         });
                       },
                     ),
@@ -115,7 +127,7 @@ class NoteDetailsState extends State<NoteDetails> {
                       ),
                       onPressed: (){
                         setState(() {
-                          //todo: will add some code hear
+                          _deleteNote();
                         });
                       },
                     ),
@@ -130,7 +142,50 @@ class NoteDetailsState extends State<NoteDetails> {
   }
 
   Future<bool> _routeScreenPOP() async{
-    Navigator.pop(context);
+    Navigator.pop(context,true);
     return false;
+  }
+
+  void _updatePriorityAsInt(selectedValue) {
+    (selectedValue=='high')?_note.priority = 0 : _note.priority = 1;
+  }
+
+  void _saveBtn() async {
+    _routeScreenPOP();
+    int result=0 ;
+    _note.date = DateFormat.yMMMd().format(DateTime.now());
+    if(_note.id !=  null) { // Update existing one
+      result = await _dataBaseHelper.updateNote(_note);
+    }else{ // Create New One
+      result = await  _dataBaseHelper.insertNote(_note);
+    }
+
+    if (result != 0){ //success
+      _showAlertDialog("Status","Note Save Successfully");
+    }else{ // failure
+      _showAlertDialog("Status", "Problem In Saving Note!");
+    }
+  }
+
+  void _showAlertDialog(String title, String msg){
+    AlertDialog ad = AlertDialog(
+      title: Text(title),
+      content: Text(msg),
+    );
+    showDialog(context: context,builder: (_) => ad);
+  }
+
+  void _deleteNote() async {
+    _routeScreenPOP();
+    if(_note.id ==  null) { // Update existing one
+      _showAlertDialog("Status", "No Note Was Deleted");
+      return;
+    }
+    int result = await _dataBaseHelper.deleteNote(_note);
+    if (result != 0){ //success
+      _showAlertDialog("Status","Note Delete Successfully");
+    }else{ // failure
+      _showAlertDialog("Status", "Problem In Deleting Note!");
+    }
   }
 }
